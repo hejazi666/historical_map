@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>منشئ الإحداثيات</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Tajawal', sans-serif;
+            touch-action: manipulation;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        .control-group {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: calc(100% - 40px);
+            backdrop-filter: blur(10px);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            flex: 1;
+            min-width: 120px;
+            max-width: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .button:active {
+            transform: scale(0.95);
+        }
+
+        .button:hover {
+            background: #2980b9;
+        }
+
+        .button.delete {
+            background: #e74c3c;
+        }
+
+        .button.delete:hover {
+            background: #c0392b;
+        }
+
+        .button.delete:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .history-panel {
+            position: fixed;
+            left: 20px;
+            top: 20px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            max-width: 300px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+            width: calc(100% - 40px);
+        }
+
+        .history-item {
+            padding: 12px;
+            margin: 8px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s;
+            font-size: 0.9em;
+        }
+
+        .history-item:active {
+            transform: scale(0.98);
+        }
+
+        .history-item:hover {
+            background: #e9ecef;
+        }
+
+        .history-item .time {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .mode-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dfe6e9;
+            border-radius: 8px;
+            background: #fff;
+            color: #2d3436;
+            font-size: 1em;
+            margin-bottom: 15px;
+            cursor: pointer;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: left 12px center;
+            background-size: 15px;
+        }
+
+        .instruction {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-size: 0.95em;
+            line-height: 1.6;
+            color: #2d3436;
+            border-right: 4px solid #74b9ff;
+        }
+
+        #copy-area {
+            width: 100%;
+            height: 70px;
+            padding: 12px;
+            border: 2px solid #dfe6e9;
+            border-radius: 8px;
+            background: #fff;
+            font-family: monospace;
+            font-size: 0.9em;
+            resize: none;
+            direction: ltr;
+            cursor: pointer;
+        }
+
+        .marker-icon {
+            width: 32px !important;
+            height: 32px !important;
+            background: #fff;
+            border: 2px solid #3498db;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #3498db;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-size: 14px;
+        }
+
+        /* تحسينات لمنع التحديد غير المقصود للنص */
+        .button, .history-item {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* تحسينات لأجهزة اللمس */
+        @media (hover: none) {
+            .button:hover {
+                background: #3498db;
+            }
+
+            .button.delete:hover {
+                background: #e74c3c;
+            }
+
+            .history-item:hover {
+                background: #f8f9fa;
+            }
+        }
+
+        /* تحسين التجاوب مع جميع أحجام الشاشات */
+        @media (max-width: 1024px) {
+            .history-panel {
+                max-width: 250px;
+            }
+
+            .control-group {
+                max-width: 350px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .control-group {
+                top: auto;
+                bottom: 10px;
+                right: 50%;
+                transform: translateX(50%);
+                padding: 12px;
+                max-width: none;
+                width: calc(100% - 20px);
+            }
+
+            .history-panel {
+                left: 50%;
+                transform: translateX(-50%);
+                top: 10px;
+                max-height: calc(100vh - 230px);
+                max-width: none;
+                width: calc(100% - 20px);
+            }
+
+            .button {
+                padding: 10px;
+                font-size: 0.9em;
+                min-width: 90px;
+            }
+
+            .marker-icon {
+                width: 36px !important;
+                height: 36px !important;
+                font-size: 15px;
+            }
+
+            h2 {
+                font-size: 1.2em;
+                margin-bottom: 10px;
+            }
+
+            .instruction {
+                padding: 10px;
+                font-size: 0.9em;
+                margin: 10px 0;
+            }
+
+            #copy-area {
+                height: 60px;
+                padding: 8px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .control-group, .history-panel {
+                width: calc(100% - 16px);
+                margin: 8px;
+                padding: 10px;
+            }
+
+            .button-group {
+                gap: 4px;
+            }
+
+            .button {
+                min-width: 70px;
+                padding: 8px;
+                font-size: 0.85em;
+            }
+
+            .history-item {
+                padding: 8px;
+                font-size: 0.8em;
+                margin: 4px 0;
+            }
+
+            .mode-select {
+                padding: 8px;
+                font-size: 0.9em;
+                margin-bottom: 10px;
+            }
+
+            .marker-icon {
+                width: 32px !important;
+                height: 32px !important;
+                font-size: 14px;
+            }
+        }
+
+        /* تحسينات للشاشات الصغيرة جداً */
+        @media (max-width: 360px) {
+            .control-group, .history-panel {
+                width: calc(100% - 12px);
+                margin: 6px;
+                padding: 8px;
+            }
+
+            .button-group {
+                gap: 3px;
+            }
+
+            .button {
+                min-width: 60px;
+                padding: 6px;
+                font-size: 0.8em;
+            }
+
+            h2 {
+                font-size: 1.1em;
+                margin-bottom: 8px;
+            }
+
+            .instruction {
+                padding: 8px;
+                font-size: 0.85em;
+                margin: 8px 0;
+            }
+
+            .history-item {
+                padding: 6px;
+                font-size: 0.75em;
+                margin: 3px 0;
+            }
+
+            .mode-select {
+                padding: 6px;
+                font-size: 0.85em;
+                margin-bottom: 8px;
+            }
+
+            #copy-area {
+                height: 50px;
+                padding: 6px;
+                font-size: 0.8em;
+            }
+
+            .marker-icon {
+                width: 28px !important;
+                height: 28px !important;
+                font-size: 12px;
+            }
+        }
+
+        /* تحسينات للشاشات الصغيرة جداً مع ارتفاع منخفض */
+        @media (max-height: 600px) {
+            .history-panel {
+                max-height: calc(100vh - 200px);
+            }
+
+            .control-group {
+                padding-top: 8px;
+                padding-bottom: 8px;
+            }
+
+            h2 {
+                font-size: 1em;
+                margin-bottom: 6px;
+            }
+
+            .instruction {
+                padding: 6px;
+                margin: 6px 0;
+            }
+
+            #copy-area {
+                height: 40px;
+            }
+        }
+
+        /* تحسينات للشاشات الصغيرة جداً مع ارتفاع منخفض جداً */
+        @media (max-height: 480px) {
+            .history-panel {
+                max-height: calc(100vh - 160px);
+            }
+
+            .control-group {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                align-items: center;
+            }
+
+            h2 {
+                font-size: 0.9em;
+                margin: 0;
+                flex: 1 1 auto;
+            }
+
+            .mode-select {
+                flex: 1 1 auto;
+                margin: 0;
+            }
+
+            .instruction {
+                flex: 2 1 100%;
+                margin: 0;
+            }
+
+            .button-group {
+                flex: 1 1 auto;
+                margin: 0;
+            }
+
+            #copy-area {
+                flex: 2 1 100%;
+                height: 35px;
+                margin: 0;
+            }
+        }
+
+        /* تحسينات لأجهزة اللمس */
+        @media (hover: none) and (pointer: coarse) {
+            .button, .history-item, .mode-select {
+                min-height: 44px; /* الحد الأدنى الموصى به من Apple للعناصر القابلة للمس */
+            }
+
+            .marker-icon {
+                min-width: 44px !important;
+                min-height: 44px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="control-group">
+        <h2>منشئ الإحداثيات</h2>
+        <select class="mode-select" id="mode">
+            <option value="a">منطقة</option>
+            <option value="c">مدينة</option>
+            <option value="cs">مدينة صغيرة</option>
+        </select>
+        <div class="instruction" id="instructions"></div>
+        <div class="button-group">
+            <button id="deleteButton" class="button delete" disabled>حذف النقطة المحددة</button>
+            <button id="undoButton" class="button">تراجع</button>
+            <button id="copyButton" class="button">نسخ</button>
+            <button id="pasteButton" class="button">اعتماد</button>
+        </div>
+        <textarea id="copy-area" placeholder="الإحداثيات ستظهر هنا... يمكنك أيضاً لصق إحداثيات سابقة هنا"></textarea>
+    </div>
+    <div class="history-panel" id="historyPanel">
+        <h3 style="margin: 0 0 10px 0;">سجل التغييرات</h3>
+        <div id="historyList"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        // إعداد الخريطة
+        const map = L.map('map').setView([24.7136, 46.6753], 6);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 12,
+            minZoom: 2,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        // المتغيرات الرئيسية
+        let coordinates = [];
+        let markers = [];
+        let currentPolygon = null;
+        let selectedMarker = null;
+        let history = [];
+        let currentHistoryIndex = -1;
+
+        // العناصر في الصفحة
+        const modeSelect = document.getElementById('mode');
+        const instructionsDiv = document.getElementById('instructions');
+        const copyArea = document.getElementById('copy-area');
+        const deleteButton = document.getElementById('deleteButton');
+        const undoButton = document.getElementById('undoButton');
+        const copyButton = document.getElementById('copyButton');
+        const pasteButton = document.getElementById('pasteButton');
+        const historyList = document.getElementById('historyList');
+
+        // تحديث زر الحذف
+        function updateDeleteButton() {
+            deleteButton.disabled = !selectedMarker;
+        }
+
+        // حفظ الحالة في التاريخ
+        function saveToHistory(action) {
+            const state = {
+                coordinates: [...coordinates],
+                markerPositions: markers.map(m => m.getLatLng()),
+                timestamp: new Date(),
+                action: action
+            };
+
+            // إزالة التاريخ المستقبلي إذا كنا قد تراجعنا
+            if (currentHistoryIndex < history.length - 1) {
+                history = history.slice(0, currentHistoryIndex + 1);
+            }
+
+            history.push(state);
+            currentHistoryIndex = history.length - 1;
+            updateHistoryPanel();
+            updateUndoButton();
+        }
+
+        // تحديث لوحة التاريخ
+        function updateHistoryPanel() {
+            historyList.innerHTML = '';
+            history.forEach((state, index) => {
+                const time = state.timestamp.toLocaleTimeString();
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                item.innerHTML = `
+                    <span>${state.action}</span>
+                    <span class="time">${time}</span>
+                `;
+                item.onclick = () => restoreState(index);
+                historyList.appendChild(item);
+            });
+            historyList.scrollTop = historyList.scrollHeight;
+        }
+
+        // استعادة حالة من التاريخ
+        function restoreState(index) {
+            if (index >= 0 && index < history.length) {
+                const state = history[index];
+                coordinates = [...state.coordinates];
+                
+                // إزالة النقاط والمضلع الحالي
+                markers.forEach(marker => map.removeLayer(marker));
+                markers = [];
+                if (currentPolygon) map.removeLayer(currentPolygon);
+
+                // إعادة إنشاء النقاط
+                state.markerPositions.forEach((pos, i) => {
+                    addMarker(pos, i + 1);
+                });
+
+                currentHistoryIndex = index;
+                updatePolygon();
+                updateCopyArea();
+                updateUndoButton();
+            }
+        }
+
+        // التراجع عن آخر تغيير
+        function undo() {
+            if (currentHistoryIndex > 0) {
+                restoreState(currentHistoryIndex - 1);
+            }
+        }
+
+        // تحديث زر التراجع
+        function updateUndoButton() {
+            undoButton.disabled = currentHistoryIndex <= 0;
+        }
+
+        // تحديث التعليمات
+        function updateInstructions() {
+            const mode = modeSelect.value;
+            let instructions = mode === 'a' 
+                ? 'انقر على الخريطة لإضافة نقاط المنطقة. يمكنك سحب النقاط لتعديل مواقعها، وحذف أي نقطة بالضغط عليها ثم "حذف النقطة المحددة". عند تحديد نقطة، النقطة الجديدة ستكون لجانبها.'
+                : 'انقر على الخريطة لتحديد الموقع. يمكنك سحب النقطة لتعديل موقعها';
+            instructions += '<br><br>يمكنك نسخ الإحداثيات بالضغط على زر "نسخ" أو لصق إحداثيات سابقة ثم الضغط على زر "اعتماد"';
+            instructionsDiv.innerHTML = instructions;
+        }
+
+        // إضافة نقطة جديدة
+        function addMarker(latlng, number) {
+            const marker = L.marker(latlng, {
+                draggable: true,
+                icon: L.divIcon({
+                    className: 'marker-icon',
+                    html: number,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                })
+            }).addTo(map);
+
+            marker.on('dragstart', function() {
+                selectedMarker = this;
+                updateDeleteButton();
+            });
+
+            marker.on('drag', function(e) {
+                const index = markers.indexOf(this);
+                if (index > -1) {
+                    coordinates[index * 2] = e.latlng.lat;
+                    coordinates[index * 2 + 1] = e.latlng.lng;
+                    updatePolygon();
+                    updateCopyArea();
+                }
+            });
+
+            marker.on('dragend', function() {
+                saveToHistory('تحريك نقطة');
+            });
+
+            marker.on('click', function() {
+                selectedMarker = this;
+                updateDeleteButton();
+            });
+
+            markers.push(marker);
+            return marker;
+        }
+
+        // حذف النقطة المحددة
+        function deleteSelectedMarker() {
+            if (selectedMarker) {
+                const index = markers.indexOf(selectedMarker);
+                if (index > -1) {
+                    map.removeLayer(selectedMarker);
+                    markers.splice(index, 1);
+                    coordinates.splice(index * 2, 2);
+                    renumberMarkers();
+                    updatePolygon();
+                    updateCopyArea();
+                    saveToHistory('حذف نقطة');
+                }
+                selectedMarker = null;
+                updateDeleteButton();
+            }
+        }
+
+        // تحديث المضلع
+        function updatePolygon() {
+            if (currentPolygon) {
+                map.removeLayer(currentPolygon);
+            }
+            if (coordinates.length >= 4 && modeSelect.value === 'a') {
+                const points = [];
+                for (let i = 0; i < coordinates.length; i += 2) {
+                    points.push([coordinates[i], coordinates[i + 1]]);
+                }
+                currentPolygon = L.polygon(points, {
+                    color: '#3498db',
+                    weight: 2,
+                    fillOpacity: 0.1
+                }).addTo(map);
+            }
+        }
+
+        // تحديث منطقة النسخ
+        function updateCopyArea() {
+            copyArea.value = coordinates.join('|');
+        }
+
+        // مسح جميع النقاط
+        function clearAll() {
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            coordinates = [];
+            if (currentPolygon) {
+                map.removeLayer(currentPolygon);
+                currentPolygon = null;
+            }
+            updateCopyArea();
+        }
+
+        // إعادة ترقيم النقاط
+        function renumberMarkers() {
+            markers.forEach((marker, index) => {
+                marker.setIcon(L.divIcon({
+                    className: 'marker-icon',
+                    html: index + 1,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                }));
+            });
+        }
+
+        // دالة لتحليل الإحداثيات الملصقة
+        function parseCoordinates(text) {
+            try {
+                // تنظيف النص من المسافات الزائدة والأسطر الجديدة
+                const cleanText = text.trim().replace(/\s+/g, '');
+                
+                // محاولة تحليل النص كـ JSON إذا كان بهذا التنسيق
+                if (cleanText.startsWith('[') && cleanText.endsWith(']')) {
+                    try {
+                        const jsonCoords = JSON.parse(cleanText);
+                        if (Array.isArray(jsonCoords) && jsonCoords.every(n => !isNaN(n))) {
+                            return jsonCoords;
+                        }
+                    } catch (e) {
+                        // تجاهل أخطاء JSON والمتابعة للتنسيقات الأخرى
+                    }
+                }
+
+                // تجربة تنسيق الفصل بـ | 
+                let coords = cleanText.split('|').map(Number);
+                
+                // إذا لم ينجح، نجرب الفصل بالفاصلة
+                if (coords.some(isNaN)) {
+                    coords = cleanText.split(',').map(Number);
+                }
+
+                // إذا لم ينجح أي تنسيق
+                if (coords.length < 2 || coords.some(isNaN)) {
+                    throw new Error('تنسيق الإحداثيات غير صحيح. يجب أن تكون الإحداثيات مفصولة بـ | أو , مثال: 24.7136|46.6753 أو 24.7136,46.6753');
+                }
+
+                // التحقق من أن عدد الإحداثيات زوجي
+                if (coords.length % 2 !== 0) {
+                    throw new Error('عدد الإحداثيات غير صحيح. يجب أن يكون لكل نقطة خط عرض وخط طول');
+                }
+
+                // التحقق من أن الأرقام ضمن النطاق المقبول
+                for (let i = 0; i < coords.length; i += 2) {
+                    const lat = coords[i];
+                    const lng = coords[i + 1];
+                    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                        throw new Error('قيم الإحداثيات خارج النطاق المسموح. خط العرض يجب أن يكون بين -90 و 90، وخط الطول بين -180 و 180');
+                    }
+                }
+
+                return coords;
+            } catch (error) {
+                alert('خطأ: ' + error.message);
+                return null;
+            }
+        }
+
+        // دالة للصق الإحداثيات
+        function pasteCoordinates() {
+            const text = copyArea.value;
+            if (!text.trim()) {
+                alert('الرجاء إدخال الإحداثيات أولاً');
+                return;
+            }
+
+            const coords = parseCoordinates(text);
+            if (!coords) return;
+
+            // حفظ الحالة الحالية قبل التغيير
+            saveToHistory('حالة سابقة');
+            
+            // مسح الحالة الحالية
+            clearAll();
+
+            // إضافة النقاط الجديدة
+            for (let i = 0; i < coords.length; i += 2) {
+                const lat = coords[i];
+                const lng = coords[i + 1];
+                coordinates.push(lat, lng);
+                addMarker([lat, lng], (i/2) + 1);
+            }
+
+            // تحديث المضلع إذا كان في وضع المنطقة
+            if (modeSelect.value === 'a') {
+                updatePolygon();
+            }
+
+            // تحديث منطقة النسخ
+            updateCopyArea();
+
+            // حفظ التغييرات في التاريخ
+            saveToHistory('اعتماد الإحداثيات');
+        }
+
+        // وظيفة النسخ
+        function copyCoordinates() {
+            copyArea.select();
+            document.execCommand('copy');
+            // إظهار رسالة نجاح
+            const originalText = copyButton.textContent;
+            copyButton.textContent = 'تم النسخ!';
+            setTimeout(() => {
+                copyButton.textContent = originalText;
+            }, 1000);
+        }
+
+        // الأحداث
+        map.on('click', function(e) {
+            const lat = parseFloat(e.latlng.lat.toFixed(4));
+            const lng = parseFloat(e.latlng.lng.toFixed(4));
+
+            if (modeSelect.value === 'a') {
+                if (selectedMarker) {
+                    // إضافة النقطة بعد النقطة المحددة
+                    const selectedIndex = markers.indexOf(selectedMarker);
+                    coordinates.splice((selectedIndex + 1) * 2, 0, lat, lng);
+                    markers.splice(selectedIndex + 1, 0, null); // حجز مكان للماركر الجديد
+                    
+                    // إعادة إنشاء جميع الماركرز بعد النقطة المحددة
+                    for (let i = selectedIndex + 1; i < markers.length; i++) {
+                        if (markers[i]) {
+                            map.removeLayer(markers[i]);
+                        }
+                    }
+                    markers = markers.slice(0, selectedIndex + 1);
+                    
+                    // إضافة الماركر الجديد والماركرز المتبقية
+                    for (let i = selectedIndex + 1; i * 2 < coordinates.length; i++) {
+                        const markerLat = coordinates[i * 2];
+                        const markerLng = coordinates[i * 2 + 1];
+                        addMarker([markerLat, markerLng], i + 1);
+                    }
+                } else {
+                    // إضافة النقطة في النهاية
+                    coordinates.push(lat, lng);
+                    addMarker(e.latlng, markers.length + 1);
+                }
+                
+                updatePolygon();
+                saveToHistory('إضافة نقطة');
+                updateCopyArea();
+            } else {
+                clearAll();
+                coordinates = [lat, lng];
+                addMarker(e.latlng, 1);
+                saveToHistory('تعيين موقع');
+                updateCopyArea();
+            }
+
+            selectedMarker = null;
+            updateDeleteButton();
+        });
+
+        // إضافة مستمعي الأحداث
+        deleteButton.addEventListener('click', deleteSelectedMarker);
+        undoButton.addEventListener('click', undo);
+        copyButton.addEventListener('click', copyCoordinates);
+        pasteButton.addEventListener('click', pasteCoordinates);
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Delete' && selectedMarker) {
+                deleteSelectedMarker();
+            }
+        });
+
+        modeSelect.addEventListener('change', function() {
+            clearAll();
+            updateInstructions();
+            saveToHistory('تغيير النمط');
+        });
+
+        // التهيئة الأولية
+        updateDeleteButton();
+        updateUndoButton();
+        updateInstructions();
+    </script>
+</body>
+</html>
