@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدير المواقع - Leaflet</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #sidebar {
+            width: 360px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.2);
+        }
+        h2 {
+            margin-bottom: 20px;
+            font-size: 24px;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .form-container {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            background: white;
+            color: #333;
+        }
+        input:read-only {
+            background: #f0f0f0;
+            cursor: not-allowed;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin-bottom: 8px;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .btn-primary {
+            background: #4CAF50;
+        }
+        .btn-primary:hover {
+            background: #45a049;
+        }
+        .btn-secondary {
+            background: #2196F3;
+        }
+        .btn-secondary:hover {
+            background: #1976D2;
+        }
+        .btn-download {
+            background: #FF9800;
+        }
+        .btn-download:hover {
+            background: #F57C00;
+        }
+        .btn-danger {
+            background: #f44336;
+        }
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+        .btn-cancel {
+            background: #9E9E9E;
+        }
+        .btn-cancel:hover {
+            background: #757575;
+        }
+        #locationsList {
+            margin-top: 15px;
+            max-height: calc(100vh - 550px);
+            overflow-y: auto;
+        }
+        .location-item {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .location-item:hover {
+            transform: translateX(-5px);
+            background: rgba(255,255,255,0.25);
+            border-color: rgba(255,255,255,0.3);
+        }
+        .location-item.editing {
+            background: rgba(33, 150, 243, 0.4);
+            border: 2px solid #2196F3;
+            box-shadow: 0 0 15px rgba(33, 150, 243, 0.5);
+        }
+        .location-name {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        .location-coords {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        .location-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .btn-small {
+            flex: 1;
+            padding: 8px 5px;
+            font-size: 11px;
+            margin-bottom: 0;
+        }
+        #map {
+            flex: 1;
+            height: 100vh;
+        }
+        .instruction {
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            line-height: 1.5;
+        }
+        .instruction.warning {
+            background: rgba(255, 152, 0, 0.3);
+            border: 1px solid rgba(255, 152, 0, 0.5);
+        }
+        #locationCount {
+            text-align: center;
+            margin: 12px 0;
+            font-size: 15px;
+            opacity: 0.95;
+            font-weight: bold;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 30px 20px;
+            opacity: 0.7;
+        }
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .form-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            text-align: center;
+            opacity: 0.95;
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h2>🗺️ مدير المواقع</h2>
+        
+        <div class="instruction">
+            <strong>كيفية الاستخدام:</strong><br>
+            انقر على الخريطة لتحديد موقع جديد
+        </div>
+
+        <!-- نموذج الإضافة -->
+        <div id="addForm" class="form-container">
+            <div class="form-title">➕ إضافة موقع جديد</div>
+            <form id="addLocationForm">
+                <div class="form-group">
+                    <label>اسم الموقع:</label>
+                    <input type="text" id="locationName" placeholder="مثال: المنزل، المكتب، المدرسة..." required>
+                </div>
+                <div class="form-group">
+                    <label>خط العرض (Latitude):</label>
+                    <input type="text" id="latitude" readonly placeholder="سيتم ملؤه تلقائياً">
+                </div>
+                <div class="form-group">
+                    <label>خط الطول (Longitude):</label>
+                    <input type="text" id="longitude" readonly placeholder="سيتم ملؤه تلقائياً">
+                </div>
+                <button type="submit" class="btn-primary">➕ إضافة الموقع</button>
+            </form>
+        </div>
+
+        <!-- نموذج التعديل -->
+        <div id="editForm" class="form-container" style="display: none;">
+            <div class="form-title">✏️ تعديل الموقع</div>
+            <div class="instruction warning">
+                اضغط على الخريطة لتحديد الموقع الجديد
+            </div>
+            <div class="form-group">
+                <label>اسم الموقع:</label>
+                <input type="text" id="editLocationName" placeholder="أدخل اسم الموقع" required>
+            </div>
+            <div class="form-group">
+                <label>خط العرض (Latitude):</label>
+                <input type="text" id="editLatitude" readonly>
+            </div>
+            <div class="form-group">
+                <label>خط الطول (Longitude):</label>
+                <input type="text" id="editLongitude" readonly>
+            </div>
+            <button onclick="saveEdit()" class="btn-secondary">💾 حفظ التعديلات</button>
+            <button onclick="cancelEdit()" class="btn-cancel">❌ إلغاء التعديل</button>
+        </div>
+
+        <div id="locationCount">عدد المواقع: 0</div>
+
+        <button class="btn-download" onclick="downloadCSV()">📥 تحميل ملف CSV</button>
+        <button class="btn-danger" onclick="clearAllLocations()">🗑️ حذف جميع المواقع</button>
+
+        <div id="locationsList"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>
+        // ============================================
+        // إعداد الخريطة
+        // ============================================
+        const map = L.map('map').setView([18.2164, 42.5053], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // ============================================
+        // المتغيرات العامة
+        // ============================================
+        let locations = [];
+        let markers = {};
+        let tempMarker = null;
+        let editingId = null;
+        let isEditMode = false;
+
+        // مفتاح التخزين الثابت
+        const STORAGE_KEY = 'leaflet_locations_data';
+
+        // ============================================
+        // عناصر DOM
+        // ============================================
+        const addForm = document.getElementById('addForm');
+        const editForm = document.getElementById('editForm');
+        const addLocationForm = document.getElementById('addLocationForm');
+        const nameInput = document.getElementById('locationName');
+        const latInput = document.getElementById('latitude');
+        const longInput = document.getElementById('longitude');
+        const editNameInput = document.getElementById('editLocationName');
+        const editLatInput = document.getElementById('editLatitude');
+        const editLongInput = document.getElementById('editLongitude');
+        const locationsList = document.getElementById('locationsList');
+        const locationCount = document.getElementById('locationCount');
+
+        // ============================================
+        // أيقونات الماركرات
+        // ============================================
+        const customIcon = L.icon({
+            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+
+        const tempIcon = L.icon({
+            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [30, 49],
+            iconAnchor: [15, 49],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+
+        // ============================================
+        // تحميل البيانات عند بدء التشغيل
+        // ============================================
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('تحميل البيانات من localStorage...');
+            loadLocationsFromStorage();
+        });
+
+        // ============================================
+        // التعامل مع النقر على الخريطة
+        // ============================================
+        map.on('click', function(e) {
+            const lat = e.latlng.lat.toFixed(6);
+            const lng = e.latlng.lng.toFixed(6);
+            
+            // إزالة الماركر المؤقت القديم
+            if (tempMarker) {
+                map.removeLayer(tempMarker);
+            }
+
+            // إضافة ماركر مؤقت جديد
+            tempMarker = L.marker([lat, lng], {icon: tempIcon}).addTo(map);
+
+            if (isEditMode) {
+                // وضع التعديل
+                editLatInput.value = lat;
+                editLongInput.value = lng;
+                tempMarker.bindPopup('📍 الموقع الجديد للتعديل').openPopup();
+            } else {
+                // وضع الإضافة
+                latInput.value = lat;
+                longInput.value = lng;
+                tempMarker.bindPopup('📍 موقع جديد - أضف اسماً له').openPopup();
+                nameInput.focus();
+            }
+        });
+
+        // ============================================
+        // إضافة موقع جديد
+        // ============================================
+        addLocationForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = nameInput.value.trim();
+            const lat = parseFloat(latInput.value);
+            const lng = parseFloat(longInput.value);
+
+            if (!name) {
+                alert('⚠️ يرجى إدخال اسم الموقع');
+                return;
+            }
+
+            if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+                alert('⚠️ يرجى النقر على الخريطة لتحديد الموقع أولاً');
+                return;
+            }
+
+            addLocation(name, lat, lng);
+            
+            // إعادة تعيين النموذج
+            addLocationForm.reset();
+            
+            // إزالة الماركر المؤقت
+            if (tempMarker) {
+                map.removeLayer(tempMarker);
+                tempMarker = null;
+            }
+        });
+
+        // ============================================
+        // دالة إضافة موقع
+        // ============================================
+        function addLocation(name, lat, lng) {
+            const id = Date.now();
+            const location = { 
+                id: id, 
+                name: name, 
+                lat: lat, 
+                lng: lng,
+                createdAt: new Date().toISOString()
+            };
+            
+            locations.push(location);
+            console.log('تمت إضافة موقع جديد:', location);
+
+            // إضافة ماركر على الخريطة
+            const marker = L.marker([lat, lng], {icon: customIcon}).addTo(map);
+            marker.bindPopup(`<b>${name}</b><br>📍 ${lat}, ${lng}`);
+            markers[id] = marker;
+
+            // حفظ في localStorage
+            saveToStorage();
+            
+            // تحديث الواجهة
+            renderLocationsList();
+            updateCount();
+        }
+
+        // ============================================
+        // بدء تعديل موقع
+        // ============================================
+        function startEdit(id) {
+            const location = locations.find(loc => loc.id === id);
+            if (!location) {
+                console.error('الموقع غير موجود');
+                return;
+            }
+
+            editingId = id;
+            isEditMode = true;
+
+            // ملء بيانات النموذج
+            editNameInput.value = location.name;
+            editLatInput.value = location.lat;
+            editLongInput.value = location.lng;
+
+            // إخفاء نموذج الإضافة وإظهار نموذج التعديل
+            addForm.style.display = 'none';
+            editForm.style.display = 'block';
+
+            // التركيز على الموقع في الخريطة
+            map.setView([location.lat, location.lng], 16);
+            if (markers[id]) {
+                markers[id].openPopup();
+            }
+
+            // تحديث القائمة لإظهار الموقع المُحرر
+            renderLocationsList();
+
+            console.log('بدء تعديل الموقع:', location);
+        }
+
+        // ============================================
+        // حفظ التعديلات
+        // ============================================
+        function saveEdit() {
+            if (!editingId) {
+                console.error('لا يوجد موقع قيد التعديل');
+                return;
+            }
+
+            const name = editNameInput.value.trim();
+            const lat = parseFloat(editLatInput.value);
+            const lng = parseFloat(editLongInput.value);
+
+            if (!name) {
+                alert('⚠️ يرجى إدخال اسم الموقع');
+                return;
+            }
+
+            if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+                alert('⚠️ يرجى النقر على الخريطة لتحديد الموقع الجديد');
+                return;
+            }
+
+            const location = locations.find(loc => loc.id === editingId);
+            if (location) {
+                // حذف الماركر القديم
+                if (markers[editingId]) {
+                    map.removeLayer(markers[editingId]);
+                    delete markers[editingId];
+                }
+
+                // تحديث البيانات
+                location.name = name;
+                location.lat = lat;
+                location.lng = lng;
+                location.updatedAt = new Date().toISOString();
+
+                console.log('تم تحديث الموقع:', location);
+
+                // إضافة ماركر جديد
+                const marker = L.marker([lat, lng], {icon: customIcon}).addTo(map);
+                marker.bindPopup(`<b>${name}</b><br>📍 ${lat}, ${lng}`);
+                markers[editingId] = marker;
+
+                // حفظ في localStorage
+                saveToStorage();
+                
+                // إنهاء وضع التعديل
+                cancelEdit();
+                
+                // تحديث القائمة
+                renderLocationsList();
+            }
+        }
+
+        // ============================================
+        // إلغاء التعديل
+        // ============================================
+        function cancelEdit() {
+            editingId = null;
+            isEditMode = false;
+
+            // إظهار نموذج الإضافة وإخفاء نموذج التعديل
+            addForm.style.display = 'block';
+            editForm.style.display = 'none';
+
+            // إزالة الماركر المؤقت
+            if (tempMarker) {
+                map.removeLayer(tempMarker);
+                tempMarker = null;
+            }
+
+            // تحديث القائمة
+            renderLocationsList();
+
+            console.log('تم إلغاء التعديل');
+        }
+
+        // ============================================
+        // حذف موقع
+        // ============================================
+        function deleteLocation(id) {
+            const location = locations.find(loc => loc.id === id);
+            if (!location) return;
+
+            if (confirm(`هل أنت متأكد من حذف الموقع "${location.name}"؟`)) {
+                // حذف الموقع من المصفوفة
+                locations = locations.filter(loc => loc.id !== id);
+                
+                // حذف الماركر من الخريطة
+                if (markers[id]) {
+                    map.removeLayer(markers[id]);
+                    delete markers[id];
+                }
+
+                console.log('تم حذف الموقع:', location);
+
+                // حفظ في localStorage
+                saveToStorage();
+                
+                // تحديث الواجهة
+                renderLocationsList();
+                updateCount();
+            }
+        }
+
+        // ============================================
+        // التكبير على موقع
+        // ============================================
+        function zoomToLocation(id) {
+            const location = locations.find(loc => loc.id === id);
+            if (location && markers[id]) {
+                map.setView([location.lat, location.lng], 17);
+                markers[id].openPopup();
+            }
+        }
+
+        // ============================================
+        // عرض قائمة المواقع
+        // ============================================
+        function renderLocationsList() {
+            locationsList.innerHTML = '';
+            
+            if (locations.length === 0) {
+                locationsList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📍</div>
+                        <div>لا توجد مواقع محفوظة</div>
+                        <div style="font-size: 12px; margin-top: 10px; opacity: 0.8;">
+                            انقر على الخريطة لإضافة موقع جديد
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            locations.forEach((location, index) => {
+                const div = document.createElement('div');
+                div.className = 'location-item';
+                
+                // إضافة كلاس للموقع المُحرر
+                if (editingId === location.id) {
+                    div.classList.add('editing');
+                }
+                
+                div.innerHTML = `
+                    <div class="location-name">${index + 1}. ${location.name}</div>
+                    <div class="location-coords">
+                        📍 ${location.lat}, ${location.lng}
+                    </div>
+                    <div class="location-actions">
+                        <button class="btn-small btn-download" onclick="event.stopPropagation(); zoomToLocation(${location.id})" title="التكبير">🔍</button>
+                        <button class="btn-small btn-secondary" onclick="event.stopPropagation(); startEdit(${location.id})" title="تعديل">✏️</button>
+                        <button class="btn-small btn-danger" onclick="event.stopPropagation(); deleteLocation(${location.id})" title="حذف">🗑️</button>
+                    </div>
+                `;
+                
+                // النقر على العنصر للتكبير
+                div.addEventListener('click', () => zoomToLocation(location.id));
+                
+                locationsList.appendChild(div);
+            });
+        }
+
+        // ============================================
+        // تحديث عداد المواقع
+        // ============================================
+        function updateCount() {
+            locationCount.textContent = `عدد المواقع: ${locations.length}`;
+        }
+
+        // ============================================
+        // حفظ البيانات في localStorage
+        // ============================================
+        function saveToStorage() {
+            try {
+                const data = JSON.stringify(locations);
+                localStorage.setItem(STORAGE_KEY, data);
+                console.log('تم حفظ البيانات بنجاح في localStorage:', locations.length, 'موقع');
+            } catch (e) {
+                console.error('خطأ في حفظ البيانات:', e);
+                alert('⚠️ حدث خطأ أثناء حفظ البيانات');
+            }
+        }
+
+        // ============================================
+        // تحميل البيانات من localStorage
+        // ============================================
+        function loadLocationsFromStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                
+                if (saved) {
+                    locations = JSON.parse(saved);
+                    console.log('تم تحميل البيانات من localStorage:', locations.length, 'موقع');
+                    
+                    // إضافة الماركرات على الخريطة
+                    locations.forEach(location => {
+                        const marker = L.marker([location.lat, location.lng], {icon: customIcon}).addTo(map);
+                        marker.bindPopup(`<b>${location.name}</b><br>📍 ${location.lat}, ${location.lng}`);
+                        markers[location.id] = marker;
+                    });
+
+                    renderLocationsList();
+                    updateCount();
+                } else {
+                    console.log('لا توجد بيانات محفوظة');
+                    renderLocationsList();
+                    updateCount();
+                }
+            } catch (e) {
+                console.error('خطأ في تحميل البيانات:', e);
+                alert('⚠️ حدث خطأ أثناء تحميل البيانات المحفوظة');
+            }
+        }
+
+        // ============================================
+        // تحميل ملف CSV
+        // ============================================
+        function downloadCSV() {
+            if (locations.length === 0) {
+                alert('⚠️ لا توجد مواقع لتحميلها');
+                return;
+            }
+
+            // إنشاء محتوى CSV مع BOM للدعم العربي
+            let csv = '\ufeff';
+            csv += 'الرقم,الاسم,خط العرض,خط الطول\n';
+            
+            locations.forEach((location, index) => {
+                csv += `${index + 1},"${location.name}",${location.lat},${location.lng}\n`;
+            });
+
+            // تحميل الملف
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            const date = new Date().toISOString().split('T')[0];
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `مواقع_${date}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            console.log('تم تحميل ملف CSV بنجاح');
+        }
+
+        // ============================================
+        // حذف جميع المواقع
+        // ============================================
+        function clearAllLocations() {
+            if (locations.length === 0) {
+                alert('⚠️ لا توجد مواقع لحذفها');
+                return;
+            }
+
+            const confirmation = confirm(
+                `هل أنت متأكد من حذف جميع المواقع (${locations.length} موقع)?\n\n` +
+                '⚠️ تحذير: لن يمكنك التراجع عن هذا الإجراء!'
+            );
+
+            if (confirmation) {
+                // حذف جميع الماركرات من الخريطة
+                Object.values(markers).forEach(marker => {
+                    map.removeLayer(marker);
+                });
+
+                // تفريغ البيانات
+                locations = [];
+                markers = {};
+
+                // حذف من localStorage
+                localStorage.removeItem(STORAGE_KEY);
+                
+                console.log('تم حذف جميع المواقع');
+
+                // تحديث الواجهة
+                renderLocationsList();
+                updateCount();
+
+                alert('✅ تم حذف جميع المواقع بنجاح');
+            }
+        }
+
+        // ============================================
+        // جعل الدوال متاحة عالمياً
+        // ============================================
+        window.deleteLocation = deleteLocation;
+        window.startEdit = startEdit;
+        window.saveEdit = saveEdit;
+        window.cancelEdit = cancelEdit;
+        window.zoomToLocation = zoomToLocation;
+        window.downloadCSV = downloadCSV;
+        window.clearAllLocations = clearAllLocations;
+    </script>
+</body>
+</html>
